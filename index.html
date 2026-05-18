@@ -618,21 +618,18 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
     </div>
   </div>
 
-  <!-- API Key -->
+  <!-- Password -->
   <div class="section">
-    <div class="label">API Ключ OpenRouter</div>
+    <div class="label">Код доступа</div>
     <div class="key-wrap">
       <span class="key-icon">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
       </span>
-      <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off" />
-      <button class="eye-toggle" onclick="toggleKey()">
-        <svg width="15" height="15" id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-      </button>
+      <input type="password" id="appPassword" placeholder="Введите код доступа" autocomplete="off" />
     </div>
     <div class="key-row">
       <div class="key-status" id="keyStatus"></div>
-      <button class="load-btn" onclick="loadModels()" id="loadBtn">Загрузить модели</button>
+      <button class="load-btn" onclick="login()" id="loginBtn">Войти</button>
     </div>
   </div>
 
@@ -780,7 +777,7 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
 
 <script>
 const tg = window.Telegram?.WebApp;
-let apiKey = '', selectedModel = null, models = [];
+let appPassword = '', selectedModel = null, models = [];
 let photo1 = null, photo2 = null;
 let selectedFormat = '9:16';
 
@@ -797,10 +794,10 @@ const AUTO_PROMPT = 'Fashion showcase video, model wearing the exact garment fro
 
 (function init() {
   if (tg) { tg.ready(); tg.expand(); }
-  const saved = localStorage.getItem('or_api_key');
+  const saved = localStorage.getItem('app_password');
   if (saved) {
-    document.getElementById('apiKey').value = saved;
-    document.getElementById('keyStatus').textContent = 'Ключ сохранён';
+    appPassword = saved;
+    document.getElementById('appPassword').value = saved;
     loadModels(true);
   }
   setTimeout(() => {
@@ -811,13 +808,11 @@ const AUTO_PROMPT = 'Fashion showcase video, model wearing the exact garment fro
 
 function haptic(type = 'light') { tg?.HapticFeedback?.impactOccurred(type); }
 
-function toggleKey() {
-  const inp = document.getElementById('apiKey');
-  const show = inp.type === 'password';
-  inp.type = show ? 'text' : 'password';
-  document.getElementById('eyeIcon').innerHTML = show
-    ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
-    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+async function login() {
+  const pwd = document.getElementById('appPassword').value.trim();
+  if (!pwd) return;
+  appPassword = pwd;
+  await loadModels(false);
 }
 
 function syncLabel(selectId, labelId) {
@@ -931,21 +926,25 @@ function selectFormat(fmt, card) {
 }
 
 async function loadModels(silent = false) {
-  const keyVal = document.getElementById('apiKey').value.trim();
-  if (!keyVal) { tg ? tg.showAlert('Введите API ключ') : alert('Введите API ключ'); return; }
-  apiKey = keyVal;
-  localStorage.setItem('or_api_key', apiKey);
+  if (!appPassword) return;
   if (!silent) haptic('medium');
 
-  const btn = document.getElementById('loadBtn');
+  const btn = document.getElementById('loginBtn');
   const stat = document.getElementById('keyStatus');
   btn.textContent = '...'; btn.disabled = true;
   stat.textContent = 'Загрузка...'; stat.style.color = 'var(--accent2)';
 
   try {
-    const r = await fetch('https://openrouter.ai/api/v1/videos/models', {
-      headers: { 'Authorization': 'Bearer ' + apiKey }
+    const r = await fetch('/api/models', {
+      headers: { 'X-App-Password': appPassword },
     });
+    if (r.status === 401) {
+      stat.textContent = 'Неверный пароль';
+      stat.style.color = '#f87171';
+      appPassword = '';
+      btn.textContent = 'Войти'; btn.disabled = false;
+      return;
+    }
     if (r.ok) {
       const d = await r.json();
       const raw = d.data || [];
@@ -962,6 +961,7 @@ async function loadModels(silent = false) {
       } else {
         models = IMG2VID_MODELS;
       }
+      localStorage.setItem('app_password', appPassword);
       stat.textContent = `✓ Загружено ${models.length} моделей`;
       stat.style.color = '#6ee7b7';
     } else throw new Error();
@@ -972,7 +972,7 @@ async function loadModels(silent = false) {
   }
 
   renderModels();
-  btn.textContent = 'Обновить'; btn.disabled = false;
+  btn.textContent = 'Войти'; btn.disabled = false;
 }
 
 function renderModels() {
@@ -1017,9 +1017,8 @@ function setStatus(html, type) {
 }
 
 async function generate() {
-  apiKey = document.getElementById('apiKey').value.trim();
   const prompt = document.getElementById('prompt').value.trim();
-  if (!apiKey)        { tg ? tg.showAlert('Введите API ключ') : alert('Введите API ключ'); return; }
+  if (!appPassword)   { tg ? tg.showAlert('Введите код доступа') : alert('Введите код доступа'); return; }
   if (!photo1)        { tg ? tg.showAlert('Загрузите фото одежды') : alert('Загрузите фото одежды'); return; }
   if (!prompt)        { tg ? tg.showAlert('Введите промпт') : alert('Введите промпт'); return; }
   if (!selectedModel) { tg ? tg.showAlert('Выберите модель') : alert('Выберите модель'); return; }
@@ -1041,13 +1040,11 @@ async function generate() {
   setStatus(`<span class="spinner"></span> Отправляем запрос…<br><span style="opacity:.6;font-size:11px;margin-top:2px;display:block">${selectedModel}</span><div class="progress-bar"><div class="progress-fill"></div></div>`, 'working');
 
   try {
-    const r = await fetch('https://openrouter.ai/api/v1/videos', {
+    const r = await fetch('/api/generate', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + apiKey,
+        'X-App-Password': appPassword,
         'Content-Type': 'application/json',
-        'HTTP-Referer': location.href,
-        'X-Title': 'AI Video Studio',
       },
       body: JSON.stringify(body),
     });
@@ -1056,8 +1053,7 @@ async function generate() {
       throw new Error(e.error?.message || `HTTP ${r.status}`);
     }
     const job = await r.json();
-    const pollUrl = job.polling_url || `https://openrouter.ai/api/v1/videos/${job.id}`;
-    poll(pollUrl, job.id, 0);
+    poll(job.id, 0);
   } catch(e) {
     setStatus('❌ ' + e.message, 'error');
     btn.disabled = false;
@@ -1065,9 +1061,11 @@ async function generate() {
   }
 }
 
-async function poll(url, jobId, attempt) {
+async function poll(jobId, attempt) {
   try {
-    const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + apiKey } });
+    const r = await fetch('/api/poll?id=' + jobId, {
+      headers: { 'X-App-Password': appPassword },
+    });
     const d = await r.json();
     if (d.status === 'completed') {
       const videoUrl = d.unsigned_urls?.[0] || `https://openrouter.ai/api/v1/videos/${jobId}/content?index=0`;
@@ -1086,7 +1084,7 @@ async function poll(url, jobId, attempt) {
       const labels = { pending: 'В очереди', in_progress: 'Генерируется' };
       const lbl = labels[d.status] || d.status;
       setStatus(`<span class="spinner"></span> ${lbl}… (${attempt * 15}с)<div class="progress-bar"><div class="progress-fill"></div></div>`, 'working');
-      setTimeout(() => poll(url, jobId, attempt + 1), 15000);
+      setTimeout(() => poll(jobId, attempt + 1), 15000);
     }
   } catch(e) {
     setStatus('❌ ' + e.message, 'error');
