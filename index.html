@@ -748,10 +748,10 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
       <video id="videoEl" controls autoplay loop playsinline></video>
     </div>
     <div class="video-actions">
-      <a id="dlBtn" class="v-btn primary" target="_blank">
+      <button id="dlBtn" class="v-btn primary" onclick="downloadVideo()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Скачать
-      </a>
+      </button>
       <button class="v-btn" onclick="generate()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         Ещё раз
@@ -780,6 +780,7 @@ const tg = window.Telegram?.WebApp;
 let appPassword = '', selectedModel = null, models = [];
 let photo1 = null, photo2 = null;
 let selectedFormat = '9:16';
+let currentVideoUrl = '';
 
 const IMG2VID_MODELS = [
   { id:'kuaishou/kling-v3.0-pro',      name:'Kling v3.0 Pro',    desc:'Kuaishou · $0.14/сек', cost_per_sec:0.14, badges:[{t:'Лучший',c:'mbadge-a'},{t:'До 15 сек',c:'mbadge-gray'}] },
@@ -1074,7 +1075,7 @@ async function poll(jobId, attempt) {
       setStatus('✓ Готово!' + cost, 'done');
       haptic('success');
       document.getElementById('videoEl').src = videoUrl;
-      document.getElementById('dlBtn').href = videoUrl;
+      currentVideoUrl = videoUrl;
       document.getElementById('videoSection').classList.add('visible');
       document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
       addHistory(videoUrl);
@@ -1094,6 +1095,25 @@ async function poll(jobId, attempt) {
   }
 }
 
+async function downloadVideo() {
+  if (!currentVideoUrl) return;
+  haptic('medium');
+  const btn = document.getElementById('dlBtn');
+  btn.textContent = 'Загрузка…'; btn.disabled = true;
+  try {
+    const r = await fetch(currentVideoUrl);
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'video-' + Date.now() + '.mp4';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } finally {
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Скачать';
+    btn.disabled = false;
+  }
+}
+
 function saveHistoryToStorage(url) {
   const key = 'vidai_history';
   const list = JSON.parse(localStorage.getItem(key) || '[]');
@@ -1110,8 +1130,8 @@ function renderHistoryItem(url) {
   v.src = url; v.muted = true; v.loop = true; v.playsInline = true;
   el.appendChild(v);
   el.onclick = () => {
+    currentVideoUrl = url;
     document.getElementById('videoEl').src = url;
-    document.getElementById('dlBtn').href = url;
     document.getElementById('videoSection').classList.add('visible');
     document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
     haptic('light');
@@ -1138,8 +1158,8 @@ function addHistory(url) {
   v.src = url; v.muted = true; v.loop = true; v.playsInline = true;
   el.appendChild(v);
   el.onclick = () => {
+    currentVideoUrl = url;
     document.getElementById('videoEl').src = url;
-    document.getElementById('dlBtn').href = url;
     document.getElementById('videoSection').classList.add('visible');
     document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
     haptic('light');
