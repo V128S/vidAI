@@ -803,6 +803,7 @@ const AUTO_PROMPT = 'Fashion showcase video, model wearing the exact garment fro
   setTimeout(() => {
     document.getElementById('overlay').classList.add('hidden');
     document.getElementById('mainPage').style.display = 'block';
+    loadHistory();
   }, 500);
 })();
 
@@ -1093,10 +1094,44 @@ async function poll(jobId, attempt) {
   }
 }
 
-function addHistory(url) {
-  const sec = document.getElementById('historySection');
+function saveHistoryToStorage(url) {
+  const key = 'vidai_history';
+  const list = JSON.parse(localStorage.getItem(key) || '[]');
+  list.unshift(url);
+  if (list.length > 20) list.length = 20;
+  localStorage.setItem(key, JSON.stringify(list));
+}
+
+function renderHistoryItem(url) {
   const grid = document.getElementById('historyGrid');
-  sec.classList.add('visible');
+  const el = document.createElement('div');
+  el.className = 'hist-item';
+  const v = document.createElement('video');
+  v.src = url; v.muted = true; v.loop = true; v.playsInline = true;
+  el.appendChild(v);
+  el.onclick = () => {
+    document.getElementById('videoEl').src = url;
+    document.getElementById('dlBtn').href = url;
+    document.getElementById('videoSection').classList.add('visible');
+    document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
+    haptic('light');
+  };
+  v.addEventListener('mouseenter', () => v.play());
+  v.addEventListener('mouseleave', () => v.pause());
+  grid.appendChild(el);
+}
+
+function loadHistory() {
+  const list = JSON.parse(localStorage.getItem('vidai_history') || '[]');
+  if (!list.length) return;
+  document.getElementById('historySection').classList.add('visible');
+  list.forEach(url => renderHistoryItem(url));
+}
+
+function addHistory(url) {
+  document.getElementById('historySection').classList.add('visible');
+  saveHistoryToStorage(url);
+  const grid = document.getElementById('historyGrid');
   const el = document.createElement('div');
   el.className = 'hist-item';
   const v = document.createElement('video');
