@@ -879,17 +879,27 @@ const AUTO_PROMPT = 'Fashion showcase video, model wearing the exact garment fro
 })();
 
 function applyStateToUI() {
-  // duration select
+  // duration select — guard against out-of-range state values
   const durSel = document.getElementById('duration');
   durSel.value = String(state.duration);
+  if (durSel.selectedIndex < 0) {
+    state.duration = DEFAULT_STATE.duration;
+    durSel.value = String(state.duration);
+    saveState();
+  }
   document.getElementById('durLabel').firstChild.textContent =
     durSel.options[durSel.selectedIndex].text + ' ';
-  // audio select
+  // audio select — guard against out-of-range state values
   const audSel = document.getElementById('audio');
   audSel.value = String(state.audio);
+  if (audSel.selectedIndex < 0) {
+    state.audio = DEFAULT_STATE.audio;
+    audSel.value = String(state.audio);
+    saveState();
+  }
   document.getElementById('audioLabel').firstChild.textContent =
     audSel.options[audSel.selectedIndex].text + ' ';
-  // format cards
+  // format cards (silent fallback — no active card if unknown ratio)
   document.querySelectorAll('.format-card').forEach(c => {
     const ratio = c.querySelector('.format-ratio')?.textContent.replace(/\s/g, '');
     const normalized = ratio === '9:16' || ratio === '4:5' || ratio === '1:1' ? ratio : null;
