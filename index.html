@@ -1106,10 +1106,10 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
         <div class="format-name">Сторис</div>
         <div class="format-ratio">9 : 16</div>
       </div>
-      <div class="format-card" onclick="selectFormat('4:5', this)">
+      <div class="format-card" onclick="selectFormat('3:4', this)">
         <div class="format-shape-wrap"><div class="fmt-shape fmt-post"></div></div>
         <div class="format-name">Пост</div>
-        <div class="format-ratio">4 : 5</div>
+        <div class="format-ratio">3 : 4</div>
       </div>
       <div class="format-card" onclick="selectFormat('1:1', this)">
         <div class="format-shape-wrap"><div class="fmt-shape fmt-square"></div></div>
@@ -1386,6 +1386,8 @@ function loadState() {
   } catch {
     state = { ...DEFAULT_STATE };
   }
+  // Migrate legacy format: '4:5' is not accepted by the OpenRouter API
+  if (state.format === '4:5') state.format = '3:4';
 }
 
 let _saveStateTimer = null;
@@ -1516,7 +1518,7 @@ function applyStateToUI() {
   // format cards (silent fallback — no active card if unknown ratio)
   document.querySelectorAll('.format-card').forEach(c => {
     const ratio = c.querySelector('.format-ratio')?.textContent.replace(/\s/g, '');
-    const normalized = ratio === '9:16' || ratio === '4:5' || ratio === '1:1' ? ratio : null;
+    const normalized = ratio === '9:16' || ratio === '3:4' || ratio === '1:1' ? ratio : null;
     c.classList.toggle('active', normalized === state.format);
   });
   renderPresets();
