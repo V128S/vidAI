@@ -20,8 +20,10 @@
   --gold-glow:   rgba(201,163,106,0.32);
   --terra:       #d97757;
   --terra-soft:  rgba(217,119,87,0.10);
+  --terra-glow:  rgba(217,119,87,0.25);
   --sage:        #8aa872;
   --sage-soft:   rgba(138,168,114,0.10);
+  --sage-glow:   rgba(138,168,114,0.25);
   --hairline:    rgba(244,237,224,0.08);
   --hairline-2:  rgba(244,237,224,0.14);
   --radius:      8px;
@@ -205,8 +207,8 @@ body::before {
   transition: background 0.2s, border-color 0.2s;
 }
 .photo-slot:active .slot-icon-ring {
-  background: var(--gold-soft);
-  border-color: var(--gold-glow);
+  background: var(--gold-glow);
+  border-color: var(--gold);
 }
 .slot-label {
   font-size: 12px;
@@ -389,7 +391,7 @@ select.hidden-select {
 /* Cost */
 .cost-bar {
   background: var(--gold-soft);
-  border: 1px solid var(--gold-soft);
+  border: 1px solid var(--gold-glow);
   border-radius: var(--radius);
   padding: 14px 16px;
   display: flex; align-items: center; justify-content: space-between;
@@ -417,12 +419,12 @@ select.hidden-select {
 }
 .status-card.done {
   background: var(--sage-soft);
-  border: 1px solid var(--sage-soft);
+  border: 1px solid var(--sage-glow);
   color: var(--sage);
 }
 .status-card.error {
   background: var(--terra-soft);
-  border: 1px solid var(--terra-soft);
+  border: 1px solid var(--terra-glow);
   color: var(--terra);
 }
 .spinner {
