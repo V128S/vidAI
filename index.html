@@ -555,6 +555,113 @@ select.hidden-select {
   border-color: var(--terra-glow);
   color: var(--terra);
 }
+/* Phase scale */
+.phase-scale {
+  display: none;
+  padding: 16px 16px 14px;
+  border-radius: var(--radius);
+  background: rgba(244,237,224,0.025);
+  border: 1px solid var(--hairline);
+}
+.phase-scale.visible { display: block; }
+.phase-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.phase-step {
+  font-family: 'Fraunces', serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  transition: color 0.4s ease, font-weight 0.4s ease;
+  white-space: nowrap;
+}
+.phase-step.active {
+  color: var(--ink);
+  font-weight: 700;
+}
+.phase-step.done {
+  color: var(--gold);
+  font-weight: 600;
+}
+.phase-sep {
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+  margin: 0 4px;
+}
+.phase-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.phase-title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink);
+  font-weight: 400;
+}
+.phase-tags {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin-top: 4px;
+}
+.phase-timer {
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.phase-result {
+  display: none;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--sage-soft);
+  border: 1px solid var(--sage-glow);
+  color: var(--sage);
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+}
+.phase-result.visible { display: block; }
+.phase-result .meta {
+  margin-top: 6px;
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: rgba(138,168,114,0.7);
+}
+.phase-error {
+  display: none;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--terra-soft);
+  border: 1px solid var(--terra-glow);
+  color: var(--terra);
+}
+.phase-error.visible { display: block; }
+.phase-error .title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+}
+.phase-error .reason {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(217,119,87,0.75);
+  margin-top: 4px;
+}
 .spinner {
   display: inline-block; width: 12px; height: 12px;
   border: 1.5px solid currentColor; border-top-color: transparent;
@@ -859,8 +966,33 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
   </div>
 
   <!-- Status -->
-  <div class="section" id="statusWrap">
-    <div class="status-card" id="statusBox"></div>
+  <div class="section" id="statusWrap" style="display:none">
+    <div class="phase-scale" id="phaseScale">
+      <div class="phase-row">
+        <span class="phase-step" data-phase="brief">БРИФ</span>
+        <span class="phase-sep"></span>
+        <span class="phase-step" data-phase="light">СВЕТ</span>
+        <span class="phase-sep"></span>
+        <span class="phase-step" data-phase="shoot">СЪЁМКА</span>
+        <span class="phase-sep"></span>
+        <span class="phase-step" data-phase="edit">МОНТАЖ</span>
+      </div>
+      <div class="phase-meta">
+        <div>
+          <div class="phase-title" id="phaseTitle">Передаём бриф в продакшен</div>
+          <div class="phase-tags" id="phaseTags">—</div>
+        </div>
+        <div class="phase-timer" id="phaseTimer">00:00</div>
+      </div>
+    </div>
+    <div class="phase-result" id="phaseResult">
+      <div class="title">✓ Кадр снят</div>
+      <div class="meta" id="phaseResultMeta">00:00</div>
+    </div>
+    <div class="phase-error" id="phaseError">
+      <div class="title">Дубль не получился</div>
+      <div class="reason" id="phaseErrorReason"></div>
+    </div>
   </div>
 
   <!-- Video Result -->
@@ -1351,11 +1483,76 @@ function updateCost() {
   document.getElementById('costLabel').textContent = `≈ $${(dur * cps).toFixed(2)} · ${dur}с`;
 }
 
-function setStatus(html, type) {
-  const box = document.getElementById('statusBox');
-  box.className = 'status-card visible ' + type;
-  box.innerHTML = html;
-  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+// ══════ STATUS ══════
+
+let _phaseTimerId = null;
+let _phaseStartTs = 0;
+
+const PHASE_ORDER = ['brief', 'light', 'shoot', 'edit'];
+const PHASE_BREAKPOINTS = [
+  { until: 10,  phase: 'brief' },
+  { until: 40,  phase: 'light' },
+  { until: 90,  phase: 'shoot' },
+  { until: Infinity, phase: 'edit' },
+];
+
+function startPhase() {
+  document.getElementById('statusWrap').style.display = 'block';
+  document.getElementById('phaseScale').classList.add('visible');
+  document.getElementById('phaseResult').classList.remove('visible');
+  document.getElementById('phaseError').classList.remove('visible');
+  _phaseStartTs = Date.now();
+  setPhaseTags();
+  tickPhase();
+  clearInterval(_phaseTimerId);
+  _phaseTimerId = setInterval(tickPhase, 1000);
+}
+
+function tickPhase() {
+  const elapsed = Math.floor((Date.now() - _phaseStartTs) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('phaseTimer').textContent = `${mm}:${ss}`;
+  const cur = PHASE_BREAKPOINTS.find(b => elapsed < b.until).phase;
+  applyPhase(cur);
+}
+
+function applyPhase(curId) {
+  const curIdx = PHASE_ORDER.indexOf(curId);
+  document.querySelectorAll('.phase-step').forEach(el => {
+    const p = el.dataset.phase;
+    const idx = PHASE_ORDER.indexOf(p);
+    el.classList.remove('active', 'done');
+    if (idx < curIdx)       el.classList.add('done');
+    else if (idx === curIdx) el.classList.add('active');
+  });
+  document.getElementById('phaseTitle').textContent = PHASE_COPY[curId];
+}
+
+function setPhaseTags() {
+  const sceneL  = SCENES.find(x => x.id === state.scene)?.label;
+  const motionL = MOTIONS.find(x => x.id === state.motion)?.label;
+  const lightL  = LIGHTS.find(x => x.id === state.light)?.label;
+  const parts = [sceneL, motionL, lightL].filter(x => x && x !== '—');
+  document.getElementById('phaseTags').textContent = parts.length ? parts.join(' · ') : '—';
+}
+
+function endPhaseSuccess(cost) {
+  clearInterval(_phaseTimerId);
+  document.getElementById('phaseScale').classList.remove('visible');
+  const meta = document.getElementById('phaseResultMeta');
+  const elapsed = Math.floor((Date.now() - _phaseStartTs) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  meta.textContent = `${mm}:${ss}` + (cost ? ` · $${cost.toFixed(2)}` : '');
+  document.getElementById('phaseResult').classList.add('visible');
+}
+
+function endPhaseError(reason) {
+  clearInterval(_phaseTimerId);
+  document.getElementById('phaseScale').classList.remove('visible');
+  document.getElementById('phaseErrorReason').textContent = reason || '';
+  document.getElementById('phaseError').classList.add('visible');
 }
 
 async function generate() {
@@ -1379,7 +1576,7 @@ async function generate() {
     generate_audio: state.audio,
   };
 
-  setStatus(`<span class="spinner"></span> Отправляем запрос…<br><span style="opacity:.6;font-size:11px;margin-top:2px;display:block">${state.selectedModel}</span><div class="progress-bar"><div class="progress-fill"></div></div>`, 'working');
+  startPhase();
 
   try {
     const r = await fetch('/api/generate', {
@@ -1397,7 +1594,7 @@ async function generate() {
     const job = await r.json();
     poll(job.id, 0);
   } catch(e) {
-    setStatus('❌ ' + e.message, 'error');
+    endPhaseError(e.message);
     btn.disabled = false;
     haptic('error');
   }
@@ -1411,8 +1608,7 @@ async function poll(jobId, attempt) {
     const d = await r.json();
     if (d.status === 'completed') {
       const videoUrl = d.unsigned_urls?.[0] || `https://openrouter.ai/api/v1/videos/${jobId}/content?index=0`;
-      const cost = d.usage?.cost ? ` · $${d.usage.cost.toFixed(3)}` : '';
-      setStatus('✓ Готово!' + cost, 'done');
+      endPhaseSuccess(d.usage?.cost);
       haptic('success');
       document.getElementById('videoEl').src = videoUrl;
       currentVideoUrl = videoUrl;
@@ -1423,13 +1619,10 @@ async function poll(jobId, attempt) {
     } else if (d.status === 'failed') {
       throw new Error(d.error || 'Ошибка генерации');
     } else {
-      const labels = { pending: 'В очереди', in_progress: 'Генерируется' };
-      const lbl = labels[d.status] || d.status;
-      setStatus(`<span class="spinner"></span> ${lbl}… (${attempt * 15}с)<div class="progress-bar"><div class="progress-fill"></div></div>`, 'working');
       setTimeout(() => poll(jobId, attempt + 1), 15000);
     }
   } catch(e) {
-    setStatus('❌ ' + e.message, 'error');
+    endPhaseError(e.message);
     document.getElementById('genBtn').disabled = !photo1;
     haptic('error');
   }
