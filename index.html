@@ -169,6 +169,20 @@ body::before {
 }
 .load-btn:active { background: var(--gold); color: var(--bg); }
 
+/* Collapsed access */
+.access-collapsed {
+  display: none;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--sage);
+  padding: 0 2px;
+  cursor: pointer;
+}
+.access-collapsed.visible { display: block; }
+.access-collapsed:active { opacity: 0.6; }
+.access-full.hidden { display: none; }
+
 /* Photo upload */
 .photo-grid {
   display: grid;
@@ -698,18 +712,23 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
     <div class="masthead-sub">Видеосъёмка одежды</div>
   </div>
 
-  <!-- Password -->
+  <!-- Access -->
   <div class="section">
     <div class="label">ПРОПУСК</div>
-    <div class="key-wrap">
-      <span class="key-icon">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-      </span>
-      <input type="password" id="appPassword" placeholder="Введите код доступа" autocomplete="off" />
+    <div class="access-full" id="accessFull">
+      <div class="key-wrap">
+        <span class="key-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </span>
+        <input type="password" id="appPassword" placeholder="Введите код доступа" autocomplete="off" />
+      </div>
+      <div class="key-row">
+        <div class="key-status" id="keyStatus"></div>
+        <button class="load-btn" onclick="login()" id="loginBtn">ВОЙТИ</button>
+      </div>
     </div>
-    <div class="key-row">
-      <div class="key-status" id="keyStatus"></div>
-      <button class="load-btn" onclick="login()" id="loginBtn">ВОЙТИ</button>
+    <div class="access-collapsed" id="accessCollapsed" onclick="expandAccess()">
+      ✓ Авторизовано
     </div>
   </div>
 
@@ -1042,6 +1061,7 @@ const IMG2VID_MODELS = [
   if (saved) {
     appPassword = saved;
     document.getElementById('appPassword').value = saved;
+    collapseAccess();
     loadModels(true);
   }
   if (new URLSearchParams(location.search).get('selftest') === '1') {
@@ -1273,6 +1293,7 @@ async function loadModels(silent = false) {
         models = IMG2VID_MODELS;
       }
       localStorage.setItem('app_password', appPassword);
+      collapseAccess();
       stat.textContent = `✓ Загружено ${models.length} моделей`;
       stat.style.color = 'var(--sage)';
     } else throw new Error();
@@ -1284,6 +1305,15 @@ async function loadModels(silent = false) {
 
   renderModels();
   btn.textContent = 'ВОЙТИ'; btn.disabled = false;
+}
+
+function collapseAccess() {
+  document.getElementById('accessFull').classList.add('hidden');
+  document.getElementById('accessCollapsed').classList.add('visible');
+}
+function expandAccess() {
+  document.getElementById('accessFull').classList.remove('hidden');
+  document.getElementById('accessCollapsed').classList.remove('visible');
 }
 
 function renderModels() {
