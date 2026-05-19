@@ -789,7 +789,7 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
       <textarea id="prompt" placeholder="Выберите режиссуру или впишите свой бриф" oninput="onPromptInput()"></textarea>
     </div>
     <div class="brief-note" id="briefNote">
-      ручная правка · пресеты заморожены<a onclick="resetPrompt()">↻ собрать заново</a>
+      ручная правка · пресеты заморожены<a role="button" tabindex="0" onclick="resetPrompt()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();resetPrompt();}">↻ собрать заново</a>
     </div>
   </div>
 
@@ -1083,6 +1083,14 @@ function applyStateToUI() {
   });
   renderPresets();
   rebuildPrompt();
+  if (state.manualPromptEdit && state.manualPromptText) {
+    const ta = document.getElementById('prompt');
+    _isProgrammaticUpdate = true;
+    ta.value = state.manualPromptText;
+    _isProgrammaticUpdate = false;
+    autoResize(ta);
+    document.getElementById('briefNote').classList.add('visible');
+  }
 }
 
 function haptic(type = 'light') { tg?.HapticFeedback?.impactOccurred(type); }
@@ -1112,11 +1120,23 @@ function onParamChange(key, value, labelId) {
 }
 
 function onPromptInput() {
-  autoResize(document.getElementById('prompt'));
-  // wired in Task 8 to flip manualPromptEdit flag
+  const ta = document.getElementById('prompt');
+  autoResize(ta);
+  if (_isProgrammaticUpdate) return;
+  if (!state.manualPromptEdit) {
+    state.manualPromptEdit = true;
+    document.getElementById('briefNote').classList.add('visible');
+  }
+  state.manualPromptText = ta.value;
+  saveState();
 }
 function resetPrompt() {
-  // wired in Task 8
+  state.manualPromptEdit = false;
+  state.manualPromptText = '';
+  saveState();
+  document.getElementById('briefNote').classList.remove('visible');
+  rebuildPrompt();
+  haptic('light');
 }
 
 function autoResize(el) {
@@ -1141,6 +1161,7 @@ function handleFile(slot, input) {
       photo2 = resized;
       renderPhotoSlot(2, resized);
     }
+    rebuildPrompt();
     updateGenBtn();
     haptic('light');
   };
@@ -1180,6 +1201,7 @@ function removePhoto(slot, e) {
     </div>`;
   }
   updateGenBtn();
+  rebuildPrompt();
   haptic('light');
 }
 
