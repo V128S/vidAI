@@ -1457,6 +1457,7 @@ let appPassword = '';
 let models = [];
 let photo1 = null, photo2 = null;
 let currentVideoUrl = '';
+let currentJobId = null;
 let currentLookNumber = null;
 
 const IMG2VID_MODELS = [
@@ -1970,12 +1971,14 @@ async function poll(jobId, attempt) {
       });
       document.getElementById('videoEl').src = videoUrl;
       currentVideoUrl = videoUrl;
+      currentJobId = jobId;
       document.getElementById('videoSection').classList.add('visible');
       document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
       saveHistoryRecord({
         id: 'look-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
         lookNumber: currentLookNumber,
         url: videoUrl,
+        jobId: jobId,
         timestamp: Date.now(),
         prompt: document.getElementById('prompt').value,
         scene: state.scene,
@@ -2001,21 +2004,37 @@ async function poll(jobId, attempt) {
   }
 }
 
+function extractJobId(url) {
+  return (url && url.match(/\/videos\/([^/?]+)/) || [])[1] || null;
+}
+
+async function downloadViaProxy(jobId, filename) {
+  const r = await fetch('/api/download?id=' + encodeURIComponent(jobId), {
+    headers: { 'X-App-Password': appPassword },
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const blob = await r.blob();
+  if (blob.size < 1024) throw new Error('Файл повреждён');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 async function downloadVideo() {
-  if (!currentVideoUrl) return;
+  const jobId = currentJobId || extractJobId(currentVideoUrl);
+  if (!jobId) { toast('Нет ID видео'); return; }
   haptic('medium');
   const btn = document.getElementById('dlBtn');
+  const origHtml = btn.innerHTML;
   btn.textContent = 'Загрузка…'; btn.disabled = true;
   try {
-    const r = await fetch(currentVideoUrl);
-    const blob = await r.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'video-' + Date.now() + '.mp4';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    await downloadViaProxy(jobId, 'look-' + (currentLookNumber || Date.now()) + '.mp4');
+  } catch (e) {
+    toast(e.message || 'Не удалось скачать');
   } finally {
-    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Скачать';
+    btn.innerHTML = origHtml;
     btn.disabled = false;
   }
 }
@@ -2151,16 +2170,12 @@ async function sheetDownload() {
   const rec = history.find(r => r.id === _currentSheetId);
   if (!rec) return;
   haptic('medium');
+  const jobId = rec.jobId || extractJobId(rec.url);
+  if (!jobId) { toast('Нет ID видео'); return; }
   try {
-    const r = await fetch(rec.url);
-    const blob = await r.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `look-${rec.lookNumber}.mp4`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  } catch {
-    toast('Не удалось скачать');
+    await downloadViaProxy(jobId, `look-${rec.lookNumber}.mp4`);
+  } catch (e) {
+    toast(e.message || 'Не удалось скачать');
   }
 }
 
