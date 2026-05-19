@@ -711,6 +711,58 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
 }
 .v-btn.primary:active { background: var(--gold); color: var(--bg); }
 
+/* Result caption */
+.result-caption {
+  margin-top: 10px;
+  padding: 0 2px;
+}
+.result-look {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+.result-date {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+.result-tags {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin-top: 4px;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: calc(100px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 10px 18px;
+  border-radius: var(--radius-chip);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 300;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* Archive (interim, restyled in Task 13) */
 .history-section { display: none; }
 .history-section.visible { display: block; }
@@ -999,7 +1051,12 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
   <div class="video-section" id="videoSection">
     <div class="label">КАДР</div>
     <div class="video-wrap">
-      <video id="videoEl" controls autoplay loop playsinline></video>
+      <video id="videoEl" controls autoplay loop playsinline muted></video>
+    </div>
+    <div class="result-caption">
+      <div class="result-look" id="resultLook">LOOK 01</div>
+      <div class="result-date" id="resultDate">—</div>
+      <div class="result-tags" id="resultTags">—</div>
     </div>
     <div class="video-actions">
       <button id="dlBtn" class="v-btn primary" onclick="downloadVideo()">
@@ -1008,7 +1065,11 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
       </button>
       <button class="v-btn" onclick="generate()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-        Ещё раз
+        Ещё дубль
+      </button>
+      <button class="v-btn" onclick="shareCurrent()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Поделиться
       </button>
     </div>
   </div>
@@ -1023,6 +1084,8 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
 
   <div style="height:8px"></div>
 </div>
+
+<div class="toast" id="toast"></div>
 
 <!-- Bottom bar -->
 <div class="bottom-bar">
@@ -1558,6 +1621,60 @@ function endPhaseError(reason) {
   document.getElementById('phaseError').classList.add('visible');
 }
 
+// ══════ RESULT ══════
+
+const MONTH_RU = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+function formatDateLong(ts) {
+  const d = new Date(ts);
+  const day = d.getDate();
+  const mon = MONTH_RU[d.getMonth()];
+  const year = d.getFullYear();
+  return `${day} ${mon} ${year}`;
+}
+
+function tagsForState() {
+  const scene  = SCENES.find(x => x.id === state.scene)?.label;
+  const motion = MOTIONS.find(x => x.id === state.motion)?.label;
+  const light  = LIGHTS.find(x => x.id === state.light)?.label;
+  return [scene, motion, light].filter(x => x && x !== '—').join(' · ') || '—';
+}
+
+function renderResult({ lookNumber, timestamp, tags }) {
+  document.getElementById('resultLook').textContent = `LOOK ${String(lookNumber).padStart(2, '0')}`;
+  document.getElementById('resultDate').textContent = formatDateLong(timestamp);
+  document.getElementById('resultTags').textContent = tags;
+}
+
+let _toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('visible'), 2200);
+}
+
+async function shareCurrent() {
+  if (!currentVideoUrl) return;
+  haptic('medium');
+  const label = `LOOK ${String(currentLookNumber || 1).padStart(2, '0')}`;
+  // Telegram Stories
+  if (tg?.shareToStory) {
+    try { tg.shareToStory(currentVideoUrl, { text: label }); return; } catch {}
+  }
+  // Web Share API
+  if (navigator.share) {
+    try { await navigator.share({ url: currentVideoUrl, title: label }); return; } catch {}
+  }
+  // Clipboard
+  try {
+    await navigator.clipboard.writeText(currentVideoUrl);
+    toast('Ссылка скопирована');
+  } catch {
+    toast('Не удалось скопировать');
+  }
+}
+
 async function generate() {
   const prompt = document.getElementById('prompt').value.trim();
   if (!appPassword)   { tg ? tg.showAlert('Введите код доступа') : alert('Введите код доступа'); return; }
@@ -1613,6 +1730,14 @@ async function poll(jobId, attempt) {
       const videoUrl = d.unsigned_urls?.[0] || `https://openrouter.ai/api/v1/videos/${jobId}/content?index=0`;
       endPhaseSuccess(d.usage?.cost);
       haptic('success');
+      currentLookNumber = state.nextLookNumber;
+      state.nextLookNumber += 1;
+      saveState();
+      renderResult({
+        lookNumber: currentLookNumber,
+        timestamp: Date.now(),
+        tags: tagsForState(),
+      });
       document.getElementById('videoEl').src = videoUrl;
       currentVideoUrl = videoUrl;
       document.getElementById('videoSection').classList.add('visible');
