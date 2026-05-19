@@ -1747,7 +1747,22 @@ async function poll(jobId, attempt) {
       currentVideoUrl = videoUrl;
       document.getElementById('videoSection').classList.add('visible');
       document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
-      addHistory(videoUrl);
+      saveHistoryRecord({
+        id: 'look-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+        lookNumber: currentLookNumber,
+        url: videoUrl,
+        timestamp: Date.now(),
+        prompt: document.getElementById('prompt').value,
+        scene: state.scene,
+        motion: state.motion,
+        light: state.light,
+        model: state.selectedModel,
+        modelName: (models.find(x => x.id === state.selectedModel) || {}).name || state.selectedModel,
+        format: state.format,
+        duration: state.duration,
+        audio: state.audio,
+        cost: d.usage?.cost || null,
+      });
       document.getElementById('genBtn').disabled = !photo1;
     } else if (d.status === 'failed') {
       throw new Error(d.error || 'Ошибка генерации');
@@ -1780,59 +1795,78 @@ async function downloadVideo() {
   }
 }
 
-function saveHistoryToStorage(url) {
-  const key = 'vidai_history';
-  const list = JSON.parse(localStorage.getItem(key) || '[]');
-  list.unshift(url);
-  if (list.length > 20) list.length = 20;
-  localStorage.setItem(key, JSON.stringify(list));
-}
+// ══════ HISTORY ══════
 
-function renderHistoryItem(url) {
-  const grid = document.getElementById('historyGrid');
-  const el = document.createElement('div');
-  el.className = 'hist-item';
-  const v = document.createElement('video');
-  v.src = url; v.muted = true; v.loop = true; v.playsInline = true;
-  el.appendChild(v);
-  el.onclick = () => {
-    currentVideoUrl = url;
-    document.getElementById('videoEl').src = url;
-    document.getElementById('videoSection').classList.add('visible');
-    document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
-    haptic('light');
-  };
-  v.addEventListener('mouseenter', () => v.play());
-  v.addEventListener('mouseleave', () => v.pause());
-  grid.appendChild(el);
-}
+const HISTORY_KEY = 'vidai_history';
+const HISTORY_LIMIT = 30;
+let history = [];
 
 function loadHistory() {
-  const list = JSON.parse(localStorage.getItem('vidai_history') || '[]');
-  if (!list.length) return;
-  document.getElementById('historySection').classList.add('visible');
-  list.forEach(url => renderHistoryItem(url));
+  try {
+    history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch {
+    history = [];
+  }
+  renderArchive();
 }
 
-function addHistory(url) {
-  document.getElementById('historySection').classList.add('visible');
-  saveHistoryToStorage(url);
+function saveHistoryRecord(record) {
+  history.push(record);
+  while (history.length > HISTORY_LIMIT) history.shift();
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+  renderArchive();
+}
+
+function deleteHistoryRecord(id) {
+  history = history.filter(r => r.id !== id);
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+  renderArchive();
+}
+
+function openLookSheet(id) {
+  // placeholder until T14 wires the look-sheet modal
+  console.log('openLookSheet:', id);
+}
+
+function renderArchive() {
+  const section = document.getElementById('historySection');
   const grid = document.getElementById('historyGrid');
-  const el = document.createElement('div');
-  el.className = 'hist-item';
-  const v = document.createElement('video');
-  v.src = url; v.muted = true; v.loop = true; v.playsInline = true;
-  el.appendChild(v);
-  el.onclick = () => {
-    currentVideoUrl = url;
-    document.getElementById('videoEl').src = url;
-    document.getElementById('videoSection').classList.add('visible');
-    document.getElementById('videoSection').scrollIntoView({ behavior: 'smooth' });
-    haptic('light');
-  };
-  v.addEventListener('mouseenter', () => v.play());
-  v.addEventListener('mouseleave', () => v.pause());
-  grid.prepend(el);
+  if (!history.length) {
+    section.classList.add('visible');
+    grid.innerHTML = '<div class="archive-empty">Архив пока пуст. Снимите первый кадр.</div>';
+    return;
+  }
+  section.classList.add('visible');
+  grid.innerHTML = '';
+  [...history].reverse().forEach(rec => {
+    const card = document.createElement('div');
+    card.className = 'archive-card';
+    card.onclick = () => openLookSheet(rec.id);
+    card.innerHTML = `
+      <div class="archive-video">
+        <video src="${rec.url}#t=0.5" preload="metadata" muted playsinline></video>
+      </div>
+      <div class="archive-meta">
+        <div class="archive-look">LOOK ${String(rec.lookNumber).padStart(2, '0')} · ${formatDateShort(rec.timestamp)}</div>
+        <div class="archive-tags">${formatRecordTags(rec)}</div>
+        <div class="archive-tech">${rec.modelName || rec.model} · ${rec.duration}с</div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function formatDateShort(ts) {
+  const d = new Date(ts);
+  const day = d.getDate();
+  const mon = MONTH_RU[d.getMonth()].slice(0, 3).toUpperCase();
+  return `${day} ${mon}`;
+}
+
+function formatRecordTags(rec) {
+  const sc = SCENES.find(x => x.id === rec.scene)?.label;
+  const mo = MOTIONS.find(x => x.id === rec.motion)?.label;
+  const li = LIGHTS.find(x => x.id === rec.light)?.label;
+  return [sc, mo, li].filter(x => x && x !== '—').join(' · ') || '—';
 }
 
 // ══════ SELF-TEST (dev) ══════
