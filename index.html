@@ -810,6 +810,56 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
 <script>
 const tg = window.Telegram?.WebApp;
 
+// ══════ CONSTS ══════
+
+const SCENES = [
+  { id: 'none',      label: '—',                fragment: '' },
+  { id: 'studio',    label: 'Студия',           fragment: ', minimalist seamless studio backdrop, professional showroom' },
+  { id: 'runway',    label: 'Подиум',           fragment: ', on a professional fashion runway, audience in soft focus' },
+  { id: 'editorial', label: 'Эдиториал',        fragment: ', high-fashion editorial setting, magazine cover aesthetic' },
+  { id: 'street',    label: 'Улица',            fragment: ', urban street setting, natural city environment' },
+  { id: 'lifestyle', label: 'Лайфстайл',        fragment: ', intimate indoor cafe setting, lived-in atmosphere' },
+  { id: 'minimal',   label: 'Минимал',          fragment: ', pure white infinity void, no environment' },
+  { id: 'beach',     label: 'Пляж',             fragment: ', sandy beach at coast, ocean horizon' },
+  { id: 'night',     label: 'Ночной город',     fragment: ', neon-lit night street, wet pavement reflections' },
+  { id: 'loft',      label: 'Лофт',             fragment: ', industrial loft with large windows' },
+  { id: 'garden',    label: 'Сад',              fragment: ', botanical garden with greenery' },
+];
+
+const MOTIONS = [
+  { id: 'none',       label: '—',                fragment: '' },
+  { id: 'static',     label: 'Статика',          fragment: ', model standing still, subtle breathing motion only' },
+  { id: 'turn360',    label: 'Поворот 360°',     fragment: ', model performs a slow full 360-degree turn' },
+  { id: 'slowWalk',   label: 'Медленный шаг',    fragment: ', model walking slowly and confidently toward camera' },
+  { id: 'poseChange', label: 'Смена поз',        fragment: ', model transitions through several editorial poses' },
+  { id: 'fabric',     label: 'Игра ткани',       fragment: ', gentle wind animating the fabric, flowing movement' },
+  { id: 'cinematic',  label: 'Кинематик',        fragment: ', ambient cinematic motion, subtle parallax' },
+  { id: 'detail',     label: 'Деталь',           fragment: ', slow camera push-in revealing intricate garment details, close-up focus on craftsmanship and texture' },
+];
+
+const LIGHTS = [
+  { id: 'none',       label: '—',                fragment: '' },
+  { id: 'softStudio', label: 'Мягкий студийный', fragment: ', soft diffused studio lighting, even illumination' },
+  { id: 'golden',     label: 'Золотой час',      fragment: ', warm golden hour sunlight, low directional angle' },
+  { id: 'neon',       label: 'Неон',             fragment: ', vibrant neon accent lighting, saturated colors' },
+  { id: 'hard',       label: 'Контрастный',      fragment: ', dramatic high-contrast lighting, hard shadows' },
+  { id: 'backlit',    label: 'Контровый',        fragment: ', strong backlight creating rim light silhouette' },
+  { id: 'moody',      label: 'Сумеречный',       fragment: ', moody twilight atmosphere, low-key lighting' },
+  { id: 'daylight',   label: 'Дневной',          fragment: ', natural even daylight, soft window light' },
+];
+
+const BASE_PROMPT = 'Fashion showcase video, model wearing the exact garment from reference photo, smooth camera motion, sharp focus on fabric and design details, 4K quality';
+
+const PHASE_NAMES = ['БРИФ', 'СВЕТ', 'СЪЁМКА', 'МОНТАЖ'];
+const PHASE_COPY  = {
+  brief:  'Передаём бриф в продакшен',
+  light:  'Свет ставится. Камера выбирает ракурс',
+  shoot:  'Идёт съёмка',
+  edit:   'Монтаж кадра. Цветокоррекция',
+  done:   'Кадр снят',
+  error:  'Дубль не получился',
+};
+
 // ══════ STATE ══════
 const STATE_KEY = 'vidai_state';
 const DEFAULT_STATE = {
@@ -843,6 +893,32 @@ function saveState() {
   }, 300);
 }
 
+// ══════ PROMPT COMPOSER ══════
+
+function composePrompt({ scene, motion, light, hasBackPhoto }) {
+  const s = SCENES.find(x => x.id === scene)?.fragment || '';
+  const m = MOTIONS.find(x => x.id === motion)?.fragment || '';
+  const l = LIGHTS.find(x => x.id === light)?.fragment || '';
+  const back = hasBackPhoto ? '. The garment is shown from front and back angles' : '';
+  return BASE_PROMPT + s + m + l + back;
+}
+
+let _isProgrammaticUpdate = false;
+function rebuildPrompt() {
+  if (state.manualPromptEdit) return;
+  const text = composePrompt({
+    scene: state.scene,
+    motion: state.motion,
+    light: state.light,
+    hasBackPhoto: !!photo2,
+  });
+  const ta = document.getElementById('prompt');
+  _isProgrammaticUpdate = true;
+  ta.value = text;
+  _isProgrammaticUpdate = false;
+  autoResize(ta);
+}
+
 // ══════ RUNTIME (не сохраняется) ══════
 let appPassword = '';
 let models = [];
@@ -859,8 +935,6 @@ const IMG2VID_MODELS = [
   { id:'alibaba/wan-2.7',              name:'Wan 2.7',           desc:'Alibaba · $0.04/сек',   cost_per_sec:0.04, badges:[{t:'Дешёвый',c:'mbadge-p'}] },
 ];
 
-const AUTO_PROMPT = 'Fashion showcase video, model wearing the exact garment from the reference photo, elegant graceful movement, soft professional studio lighting, smooth cinematic camera motion, close-up details of fabric texture and stitching quality, high-end boutique atmosphere, sharp focus on design details, 4K quality';
-
 (function init() {
   if (tg) { tg.ready(); tg.expand(); }
   loadState();
@@ -870,6 +944,9 @@ const AUTO_PROMPT = 'Fashion showcase video, model wearing the exact garment fro
     appPassword = saved;
     document.getElementById('appPassword').value = saved;
     loadModels(true);
+  }
+  if (new URLSearchParams(location.search).get('selftest') === '1') {
+    runSelfTest();
   }
   setTimeout(() => {
     document.getElementById('overlay').classList.add('hidden');
@@ -959,18 +1036,9 @@ function handleFile(slot, input) {
     if (slot === 1) {
       photo1 = resized;
       renderPhotoSlot(1, resized);
-      if (!document.getElementById('prompt').value.trim()) {
-        document.getElementById('prompt').value = AUTO_PROMPT + (photo2 ? ' The garment is shown from front and back angles.' : '');
-        autoResize(document.getElementById('prompt'));
-      }
     } else {
       photo2 = resized;
       renderPhotoSlot(2, resized);
-      const pr = document.getElementById('prompt');
-      if (pr.value === AUTO_PROMPT) {
-        pr.value = AUTO_PROMPT + ' The garment is shown from front and back angles.';
-        autoResize(pr);
-      }
     }
     updateGenBtn();
     haptic('light');
@@ -1286,6 +1354,35 @@ function addHistory(url) {
   v.addEventListener('mouseenter', () => v.play());
   v.addEventListener('mouseleave', () => v.pause());
   grid.prepend(el);
+}
+
+// ══════ SELF-TEST (dev) ══════
+
+function runSelfTest() {
+  const log = (...a) => console.log('%c[selftest]', 'color:#c9a36a', ...a);
+  const fail = (msg) => { console.error('[selftest] FAIL:', msg); throw new Error(msg); };
+
+  // composePrompt empties
+  const empty = composePrompt({ scene: 'none', motion: 'none', light: 'none', hasBackPhoto: false });
+  if (empty !== BASE_PROMPT) fail('composePrompt with all none should equal BASE_PROMPT');
+
+  // composePrompt scene only
+  const sceneOnly = composePrompt({ scene: 'runway', motion: 'none', light: 'none', hasBackPhoto: false });
+  if (!sceneOnly.includes('runway')) fail('composePrompt scene fragment not added');
+
+  // composePrompt all three
+  const full = composePrompt({ scene: 'studio', motion: 'turn360', light: 'golden', hasBackPhoto: true });
+  if (!full.includes('seamless studio')) fail('full: scene fragment missing');
+  if (!full.includes('360-degree')) fail('full: motion fragment missing');
+  if (!full.includes('golden hour')) fail('full: light fragment missing');
+  if (!full.endsWith('back angles')) fail('full: back-photo suffix missing or misplaced');
+
+  // unknown id falls back to empty
+  const unknown = composePrompt({ scene: 'lol', motion: 'kek', light: 'lmao', hasBackPhoto: false });
+  if (unknown !== BASE_PROMPT) fail('unknown ids should produce BASE_PROMPT');
+
+  log('composePrompt: 5/5 OK');
+  log('All assertions passed');
 }
 </script>
 </body>
