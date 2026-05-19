@@ -83,36 +83,46 @@ body::before {
   overflow: hidden;
 }
 
-/* Header */
-.app-header {
-  padding: 20px 16px 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* Masthead */
+.masthead {
+  padding: 28px 16px 8px;
   position: relative;
   z-index: 1;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 4px;
 }
-.app-icon {
-  width: 40px; height: 40px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--gold), var(--gold));
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+.masthead-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
-.app-icon svg { width: 20px; height: 20px; fill: white; }
-.app-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 19px;
-  font-weight: 700;
+.masthead-title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 28px;
+  font-weight: 400;
   letter-spacing: -0.01em;
   color: var(--ink);
+  line-height: 1.0;
 }
-.app-sub {
-  font-size: 11px;
+.masthead-vol {
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   color: var(--ink-muted);
-  margin-top: 2px;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.masthead-sub {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin-top: 6px;
   font-weight: 400;
-  letter-spacing: 0.01em;
 }
 
 /* API Key */
@@ -583,15 +593,13 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
 
 <div class="page" id="mainPage" style="display:none">
 
-  <!-- Header -->
-  <div class="app-header">
-    <div class="app-icon">
-      <svg viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+  <!-- Masthead -->
+  <div class="masthead">
+    <div class="masthead-top">
+      <div class="masthead-title">AI Video Studio</div>
+      <div class="masthead-vol">VOL.04 · 2026</div>
     </div>
-    <div>
-      <div class="app-title">AI Video Studio</div>
-      <div class="app-sub">Демонстрация одежды для Instagram</div>
-    </div>
+    <div class="masthead-sub">Видеосъёмка одежды</div>
   </div>
 
   <!-- Password -->
