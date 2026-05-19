@@ -1918,10 +1918,13 @@ async function generate() {
   btn.disabled = true;
   document.getElementById('videoSection').classList.remove('visible');
 
+  const inputRefs = [{ type: 'image_url', image_url: { url: photo1 } }];
+  if (photo2) inputRefs.push({ type: 'image_url', image_url: { url: photo2 } });
+
   const body = {
     model: state.selectedModel,
     prompt,
-    image_url: photo1,
+    input_references: inputRefs,
     aspect_ratio: state.format,
     duration: state.duration,
     generate_audio: state.audio,
