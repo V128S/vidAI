@@ -1664,7 +1664,12 @@ async function shareCurrent() {
   }
   // Web Share API
   if (navigator.share) {
-    try { await navigator.share({ url: currentVideoUrl, title: label }); return; } catch {}
+    try {
+      await navigator.share({ url: currentVideoUrl, title: label });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
   }
   // Clipboard
   try {
