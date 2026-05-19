@@ -302,6 +302,57 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 
+/* Direction (presets) */
+.direction-block + .direction-block { margin-top: 14px; }
+.direction-row-label {
+  font-family: 'Fraunces', serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 0 2px;
+  margin-bottom: 8px;
+}
+.chip-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--hairline-2);
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0.01em;
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip:active { opacity: 0.7; }
+.chip.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+  font-weight: 600;
+}
+.chip[data-id="none"] { padding: 0 12px; opacity: 0.7; }
+.chip[data-id="none"].active { opacity: 1; }
+
 /* Brief (prompt) */
 .prompt-wrap {
   background: rgba(244,237,224,0.025);
@@ -711,6 +762,26 @@ video { width: 100%; display: block; max-height: 440px; object-fit: contain; }
     </div>
   </div>
 
+  <!-- Direction -->
+  <div class="section">
+    <div class="label">РЕЖИССУРА</div>
+
+    <div class="direction-block">
+      <div class="direction-row-label">Сцена</div>
+      <div class="chip-row" id="chipRowScene"></div>
+    </div>
+
+    <div class="direction-block">
+      <div class="direction-row-label">Движение</div>
+      <div class="chip-row" id="chipRowMotion"></div>
+    </div>
+
+    <div class="direction-block">
+      <div class="direction-row-label">Свет</div>
+      <div class="chip-row" id="chipRowLight"></div>
+    </div>
+  </div>
+
   <!-- Brief -->
   <div class="section">
     <div class="label">БРИФ</div>
@@ -919,6 +990,34 @@ function rebuildPrompt() {
   autoResize(ta);
 }
 
+// ══════ UI: CHIPS ══════
+
+function renderChipRow(containerId, items, stateKey) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  items.forEach(item => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'chip' + (state[stateKey] === item.id ? ' active' : '');
+    el.dataset.id = item.id;
+    el.textContent = item.label;
+    el.onclick = () => {
+      state[stateKey] = item.id;
+      saveState();
+      c.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x.dataset.id === item.id));
+      haptic('light');
+      rebuildPrompt();
+    };
+    c.appendChild(el);
+  });
+}
+
+function renderPresets() {
+  renderChipRow('chipRowScene',  SCENES,  'scene');
+  renderChipRow('chipRowMotion', MOTIONS, 'motion');
+  renderChipRow('chipRowLight',  LIGHTS,  'light');
+}
+
 // ══════ RUNTIME (не сохраняется) ══════
 let appPassword = '';
 let models = [];
@@ -982,6 +1081,8 @@ function applyStateToUI() {
     const normalized = ratio === '9:16' || ratio === '4:5' || ratio === '1:1' ? ratio : null;
     c.classList.toggle('active', normalized === state.format);
   });
+  renderPresets();
+  rebuildPrompt();
 }
 
 function haptic(type = 'light') { tg?.HapticFeedback?.impactOccurred(type); }
